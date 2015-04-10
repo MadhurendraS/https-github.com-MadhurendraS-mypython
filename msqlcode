@@ -1,0 +1,31 @@
+from sqlalchemy.orm import aliased
+
+class Part(Base):
+    __tablename__ = 'part'
+    part = Column(String, primary_key=True)
+    sub_part = Column(String, primary_key=True)
+    quantity = Column(Integer)
+
+included_parts = session.query(
+                Part.sub_part,
+                Part.part,
+                Part.quantity).\
+                    filter(Part.part=="our part").\
+                    cte(name="included_parts", recursive=True)
+
+incl_alias = aliased(included_parts, name="pr")
+parts_alias = aliased(Part, name="p")
+included_parts = included_parts.union_all(
+    session.query(
+        parts_alias.sub_part,
+        parts_alias.part,
+        parts_alias.quantity).\
+            filter(parts_alias.part==incl_alias.c.sub_part)
+    )
+
+q = session.query(
+        included_parts.c.sub_part,
+        func.sum(included_parts.c.quantity).
+            label('total_quantity')
+    ).\
+    group_by(included_parts.c.sub_part)
